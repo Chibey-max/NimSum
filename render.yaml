@@ -1,0 +1,17 @@
+# Render blueprint. The web service is free tier: it sleeps after 15 minutes
+# of inactivity and wakes on the next request. State lives in Supabase, not on
+# disk, so sleeping costs nothing but the wake-up latency.
+services:
+  - type: web
+    name: nimsum
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: cd client && npm ci && npm run build && cd ../server && npm ci
+    startCommand: cd server && npm start
+    healthCheckPath: /api/stats
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        sync: false   # set this in the Render dashboard, never in the repo
