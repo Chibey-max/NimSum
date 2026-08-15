@@ -7,3 +7,5 @@ dist
 *.local
 .env
 .env.local
+*.tsbuildinfo
+HandsOff.md
