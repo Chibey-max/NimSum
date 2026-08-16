@@ -216,6 +216,33 @@ export function createApp(store: Store, options: AppOptions = {}) {
     })
   })
 
+  /**
+   * Practice on a past board. Grading runs through the same validator as a
+   * real solve, but nothing is persisted: past boards are for trying, not for
+   * retroactively farming a streak, so this route never touches the store.
+   */
+  app.post('/api/practice', rateLimit(60, 60_000), (req, res) => {
+    const { date: rawDate, chain } = req.body ?? {}
+    const date = isValidDate(rawDate) ? rawDate : todayUtc()
+    if (date === todayUtc()) {
+      res.status(400).json({ error: 'Today’s board counts for real. Sign in and submit it.' })
+      return
+    }
+    const puzzle = store.puzzleFor(date)
+    const result = validateChain(puzzle, chain)
+    if (!result.ok) {
+      res.status(400).json({ error: result.reason })
+      return
+    }
+    res.json({
+      length: result.length,
+      sum: result.sum,
+      score: result.score,
+      beatPar: result.beatPar,
+      par: puzzle.par,
+    })
+  })
+
   // -- solving ------------------------------------------------------------
 
   app.post('/api/solve', requireSession, rateLimit(60, 60_000), async (req, res) => {

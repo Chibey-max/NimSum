@@ -115,6 +115,11 @@ export const api = {
       you: number | null
     }>(`/api/leaderboard${date ? `?date=${date}` : ''}`),
   me: () => request<{ address: string; stats: PlayerStats; todaySolved: boolean }>('/api/me'),
+  practice: (date: string, chain: number[]) =>
+    request<{ length: number; sum: number; score: number; beatPar: boolean; par: number }>(
+      '/api/practice',
+      { method: 'POST', body: JSON.stringify({ date, chain }) },
+    ),
   stats: () =>
     request<{ uniquePlayers: number; totalSolves: number; today: string; playersToday: number }>(
       '/api/stats',

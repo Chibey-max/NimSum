@@ -248,6 +248,34 @@ test('past boards cannot be solved for retroactive streaks', async () => {
   assert.match(solved.body.error, /today/i)
 })
 
+test('past boards can be practiced without signing in and without persisting', async () => {
+  const yesterday = dayBefore(todayUtc())
+  const puzzle = await api(`/api/puzzle?date=${yesterday}`)
+  const chain = findParChain(puzzle.body.values, puzzle.body.cells, puzzle.body.target, puzzle.body.par)!
+
+  const practiced = await api('/api/practice', {
+    method: 'POST',
+    body: JSON.stringify({ date: yesterday, chain }),
+  })
+  assert.equal(practiced.status, 200)
+  assert.equal(practiced.body.length, puzzle.body.par)
+  assert.equal(practiced.body.beatPar, true)
+
+  // No session was ever presented, so nothing could have been recorded.
+  const board = await api(`/api/leaderboard?date=${yesterday}`)
+  assert.equal(board.body.players, 0)
+})
+
+test('practice refuses today’s board, which must be solved for real', async () => {
+  const puzzle = await api('/api/puzzle')
+  const chain = findParChain(puzzle.body.values, puzzle.body.cells, puzzle.body.target, puzzle.body.par)!
+  const practiced = await api('/api/practice', {
+    method: 'POST',
+    body: JSON.stringify({ date: todayUtc(), chain }),
+  })
+  assert.equal(practiced.status, 400)
+})
+
 test('leaderboard ranks solvers and reports totals', async () => {
   const board = await api('/api/leaderboard')
   assert.equal(board.status, 200)
