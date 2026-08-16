@@ -263,6 +263,12 @@ test('leaderboard ranks solvers and reports totals', async () => {
   for (let i = 1; i < scores.length; i++) assert.ok(scores[i] <= scores[i - 1])
 })
 
+test('health check does not require a database round trip to succeed', async () => {
+  const { status, body } = await api('/api/health')
+  assert.equal(status, 200)
+  assert.equal(body.ok, true)
+})
+
 test('public stats expose real usage counters', async () => {
   const { body } = await api('/api/stats')
   assert.ok(body.uniquePlayers >= 1)

@@ -114,7 +114,14 @@ export function createApp(store: Store, options: AppOptions = {}) {
   // without the API's catch-all intercepting page requests.
   if (options.clientDir) app.use(express.static(options.clientDir))
 
-  /** Health and public usage counters, also useful as honest submission data. */
+  /** Liveness probe. Deliberately does not touch the database: a Supabase
+   *  pooler reconnect can exceed a platform health check's timeout even
+   *  though the process itself is fine, which would cause needless restarts. */
+  app.get('/api/health', (_req, res) => {
+    res.json({ ok: true })
+  })
+
+  /** Public usage counters, also useful as honest submission data. */
   app.get('/api/stats', async (_req, res) => {
     const [uniquePlayers, totalSolves, playersToday] = await Promise.all([
       store.uniquePlayers(),
