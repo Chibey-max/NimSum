@@ -137,8 +137,12 @@ export function createApp(store: Store, options: AppOptions = {}) {
     res.json(issueChallenge())
   })
 
+  // A device minting more wallets than this in a day is farming the unique-
+  // players metric, not a household sharing a phone. Chosen generously.
+  const MAX_NEW_ADDRESSES_PER_DEVICE_PER_DAY = 5
+
   app.post('/api/auth/verify', rateLimit(30, 60_000), async (req, res) => {
-    const { nonce, publicKey, signature } = req.body ?? {}
+    const { nonce, publicKey, signature, deviceId } = req.body ?? {}
     if (typeof nonce !== 'string' || typeof publicKey !== 'string' || typeof signature !== 'string') {
       res.status(400).json({ error: 'nonce, publicKey and signature are required.' })
       return
@@ -157,6 +161,24 @@ export function createApp(store: Store, options: AppOptions = {}) {
     }
 
     const address = verified.identity.address
+
+    // Best-effort and additive only: a client that never sends a deviceId
+    // (outside Nimiq Pay, or an older SDK) is never blocked by this check.
+    if (typeof deviceId === 'string' && deviceId) {
+      const today = todayUtc()
+      const alreadySeen = await store.hasSeenDevice(deviceId, address, today)
+      if (!alreadySeen) {
+        const count = await store.newAddressesTodayFor(deviceId, today)
+        if (count >= MAX_NEW_ADDRESSES_PER_DEVICE_PER_DAY) {
+          res.status(429).json({
+            error: 'Too many wallets have signed in from this device today. Try again tomorrow.',
+          })
+          return
+        }
+      }
+      await store.recordDeviceSeen(deviceId, address, today)
+    }
+
     await store.touchPlayer(address, verified.identity.publicKey)
     const token = createSession(address, verified.identity.publicKey)
 

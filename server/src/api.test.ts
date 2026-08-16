@@ -42,7 +42,7 @@ async function api(path: string, init: RequestInit = {}) {
 }
 
 /** Full sign-in: challenge, sign with a real key, exchange for a session. */
-async function signIn() {
+async function signIn(deviceId?: string) {
   const priv = Nimiq.PrivateKey.generate()
   const pub = Nimiq.PublicKey.derive(priv)
 
@@ -52,14 +52,22 @@ async function signIn() {
 
   const verified = await api('/api/auth/verify', {
     method: 'POST',
-    body: JSON.stringify({ nonce, publicKey: pub.toHex(), signature: sig.toHex() }),
+    body: JSON.stringify({ nonce, publicKey: pub.toHex(), signature: sig.toHex(), deviceId }),
   })
-  assert.equal(verified.status, 200, `sign-in failed: ${JSON.stringify(verified.body)}`)
   return {
+    status: verified.status,
+    body: verified.body,
     token: verified.body.token as string,
     address: verified.body.address as string,
     auth: { authorization: `Bearer ${verified.body.token}` },
   }
+}
+
+/** The common case: assert sign-in succeeded, then hand back the session. */
+async function signInOk(deviceId?: string) {
+  const me = await signIn(deviceId)
+  assert.equal(me.status, 200, `sign-in failed: ${JSON.stringify(me.body)}`)
+  return me
 }
 
 /** Find a genuine shortest chain for a board, used to submit honest solves. */
@@ -120,8 +128,41 @@ test('a forged session token is refused', async () => {
   assert.equal(status, 401)
 })
 
+test('a device signing in as the same wallet again is never blocked', async () => {
+  const deviceId = 'device-repeat-test'
+  const priv = Nimiq.PrivateKey.generate()
+  const pub = Nimiq.PublicKey.derive(priv)
+
+  async function signInAs() {
+    const challenge = await api('/api/auth/challenge', { method: 'POST' })
+    const nonce = challenge.body.nonce as string
+    const sig = Nimiq.Signature.create(priv, pub, framedMessageBytes(challengeMessage(nonce)))
+    return api('/api/auth/verify', {
+      method: 'POST',
+      body: JSON.stringify({ nonce, publicKey: pub.toHex(), signature: sig.toHex(), deviceId }),
+    })
+  }
+
+  const first = await signInAs()
+  assert.equal(first.status, 200)
+  const second = await signInAs()
+  assert.equal(second.status, 200, 'the same wallet re-signing in from the same device must never be refused')
+})
+
+test('a device minting many new wallets in a day is slowed down', async () => {
+  const deviceId = 'device-farm-test'
+  const results: number[] = []
+  for (let i = 0; i < 7; i++) {
+    const me = await signIn(deviceId)
+    results.push(me.status)
+  }
+  assert.ok(results.some((s) => s === 429), `expected a 429 among ${JSON.stringify(results)}`)
+  // The first several distinct wallets from the device must still work.
+  assert.equal(results[0], 200)
+})
+
 test('sign in, solve at par, and get a real rank', async () => {
-  const me = await signIn()
+  const me = await signInOk()
 
   const puzzle = await api('/api/puzzle', { headers: me.auth })
   assert.ok(puzzle.body.startedAt, 'server should start the clock on first view')
@@ -147,7 +188,7 @@ test('sign in, solve at par, and get a real rank', async () => {
 })
 
 test('a second solve on the same day is refused', async () => {
-  const me = await signIn()
+  const me = await signInOk()
   const puzzle = await api('/api/puzzle', { headers: me.auth })
   const chain = findParChain(puzzle.body.values, puzzle.body.cells, puzzle.body.target, puzzle.body.par)!
 
@@ -167,7 +208,7 @@ test('a second solve on the same day is refused', async () => {
 })
 
 test('the server ignores any score the client tries to send', async () => {
-  const me = await signIn()
+  const me = await signInOk()
   const puzzle = await api('/api/puzzle', { headers: me.auth })
   const chain = findParChain(puzzle.body.values, puzzle.body.cells, puzzle.body.target, puzzle.body.par)!
 
@@ -192,7 +233,7 @@ test('the server ignores any score the client tries to send', async () => {
 })
 
 test('invalid chains are rejected with a readable reason', async () => {
-  const me = await signIn()
+  const me = await signInOk()
   const puzzle = await api('/api/puzzle', { headers: me.auth })
   const cells = puzzle.body.cells as { q: number; r: number }[]
 
@@ -234,7 +275,7 @@ test('invalid chains are rejected with a readable reason', async () => {
 })
 
 test('past boards cannot be solved for retroactive streaks', async () => {
-  const me = await signIn()
+  const me = await signInOk()
   const yesterday = dayBefore(todayUtc())
   const puzzle = await api(`/api/puzzle?date=${yesterday}`, { headers: me.auth })
   const chain = findParChain(puzzle.body.values, puzzle.body.cells, puzzle.body.target, puzzle.body.par)!

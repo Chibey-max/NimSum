@@ -72,6 +72,17 @@ CREATE TABLE IF NOT EXISTS attempts (
   started_at BIGINT NOT NULL,
   PRIMARY KEY (address, date)
 );
+
+-- Nimiq Pay's per-device identifier (device, not wallet). Used only to slow
+-- down one visitor minting many wallets in a day to farm the unique-players
+-- metric; it never blocks a returning address, so a shared family device is
+-- unaffected.
+CREATE TABLE IF NOT EXISTS device_seen (
+  device_id TEXT NOT NULL,
+  address   TEXT NOT NULL,
+  date      TEXT NOT NULL,
+  PRIMARY KEY (device_id, address, date)
+);
 `
 
 export class Store {
@@ -113,6 +124,35 @@ export class Store {
          last_seen  = EXCLUDED.last_seen,
          public_key = COALESCE(EXCLUDED.public_key, players.public_key)`,
       [address, publicKey ?? null, now],
+    )
+  }
+
+  /**
+   * How many distinct addresses this device has signed in as today,
+   * including `address` itself if already recorded. Used to slow down
+   * wallet-farming without penalizing a returning or shared device.
+   */
+  async newAddressesTodayFor(deviceId: string, date: string): Promise<number> {
+    const rows = await this.sql.query<{ n: string }>(
+      `SELECT COUNT(DISTINCT address) AS n FROM device_seen WHERE device_id = $1 AND date = $2`,
+      [deviceId, date],
+    )
+    return Number(rows[0]?.n ?? 0)
+  }
+
+  async hasSeenDevice(deviceId: string, address: string, date: string): Promise<boolean> {
+    const rows = await this.sql.query(
+      `SELECT 1 FROM device_seen WHERE device_id = $1 AND address = $2 AND date = $3`,
+      [deviceId, address, date],
+    )
+    return rows.length > 0
+  }
+
+  async recordDeviceSeen(deviceId: string, address: string, date: string): Promise<void> {
+    await this.sql.query(
+      `INSERT INTO device_seen (device_id, address, date) VALUES ($1, $2, $3)
+       ON CONFLICT (device_id, address, date) DO NOTHING`,
+      [deviceId, address, date],
     )
   }
 
