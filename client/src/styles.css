@@ -23,8 +23,40 @@
 
   --radius: 14px;
 
+  /* Text drawn on top of the honey accent. Fixed regardless of theme: honey
+     stays a bright, warm colour in both, so it always wants dark text. */
+  --on-accent: #17140a;
+  /* Honey used as text color directly on the page ground. Bright honey reads
+     fine on dark ink (9.5:1) but fails contrast on light cream (1.7:1), so
+     this is a separate token rather than reusing --honey for both jobs. */
+  --accent-text: var(--honey);
+
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+
+  color-scheme: dark;
+}
+
+/* Light theme. Same brand accent (honey), same structure, ground and text
+   roles invert. Toggled by ThemeToggle, persisted, defaults to dark. */
+[data-theme='light'] {
+  --ink: #faf6ec;
+  --ink-2: #f1ead9;
+  --surface: #ffffff;
+  --hex: #e6e2f5;
+  --hex-edge: #cdc7e8;
+  /* Darker than dark theme's: at full brightness this fails contrast for the
+     outline glyph, focus ring, and locked-hex border on a light ground. */
+  --honey-bright: #a97a0f;
+  --honey-deep: #a97a0f;
+  --coral: #c8503b;
+  --bone: #201c39;
+  --muted: #5b5e82;
+  --muted-dim: #86869f;
+  /* 5.4:1 against the light ground, comfortably passing AA for small text. */
+  --accent-text: #8a5c0a;
+
+  color-scheme: light;
 }
 
 * {
@@ -135,6 +167,104 @@ body {
   font-size: 13px;
 }
 
+/* ---- theme toggle ---- */
+
+.theme-toggle {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--honey-bright);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .theme-toggle:hover .theme-icon {
+    transform: rotate(-16deg) scale(1.08);
+  }
+}
+
+.theme-toggle:active .theme-icon {
+  transform: scale(0.88);
+}
+
+.theme-icon {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--honey);
+  transition: transform 0.2s var(--ease-out), background-color 0.3s var(--ease-out);
+}
+
+.theme-icon::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--ink);
+  transform: translate(30%, -30%) scale(0.82);
+  opacity: 0;
+  transition: opacity 0.25s var(--ease-out), background-color 0.3s var(--ease-out);
+}
+
+.theme-icon.dark::after {
+  opacity: 1;
+}
+
+/* The circular reveal is driven manually (ThemeToggle animates the clip-path
+   on ::view-transition-new(root)), so the browser's own crossfade is turned
+   off to avoid animating twice at once. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 0;
+}
+
+::view-transition-new(root) {
+  z-index: 1;
+}
+
+/* Fallback path (no View Transitions support, or reduced motion): the
+   surfaces most visibly tied to the theme swap color smoothly instead of
+   snapping. Interactive elements (buttons, hexes) already transition their
+   own paint properties from the interaction-polish pass. */
+body,
+.shell,
+.rules,
+.archive-overlay,
+.archive-panel,
+.result,
+.tip,
+.prompt,
+.footnote,
+.hint,
+.notice,
+.target-readout,
+.hero-sub,
+.hero-stat,
+.you-stats,
+.ranks li {
+  transition: background-color 0.25s var(--ease-out), border-color 0.25s var(--ease-out), color 0.25s var(--ease-out);
+}
+
+.target-glyph.outline {
+  transition: stroke 0.25s var(--ease-out);
+}
+
 /* ---- header ---- */
 
 .topbar {
@@ -173,7 +303,7 @@ body {
 }
 
 .difficulty {
-  color: var(--honey);
+  color: var(--accent-text);
   border: 1px solid var(--honey-deep);
   border-radius: 99px;
   padding: 2px 8px;
@@ -201,7 +331,7 @@ body {
   background: none;
   border: none;
   padding: 0;
-  color: var(--honey);
+  color: var(--accent-text);
   font: inherit;
   cursor: pointer;
   text-decoration: underline;
@@ -321,7 +451,7 @@ body {
 }
 
 .exact-tag {
-  color: var(--honey-bright);
+  color: var(--accent-text);
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -381,7 +511,7 @@ body {
 
 .hex.dimmed polygon {
   fill: var(--ink-2);
-  stroke: #262b52;
+  stroke: var(--hex-edge);
 }
 
 .hex.dimmed text {
@@ -398,7 +528,7 @@ body {
 }
 
 .hex.linked text {
-  fill: var(--ink);
+  fill: var(--on-accent);
 }
 
 .hex.head polygon {
@@ -410,7 +540,7 @@ body {
   font-family: var(--data);
   font-size: 11px;
   font-weight: 600;
-  fill: var(--ink);
+  fill: var(--on-accent);
   opacity: 0.65;
 }
 
@@ -437,7 +567,7 @@ body {
   font-family: var(--data);
   font-size: 12px;
   font-weight: 600;
-  color: var(--ink);
+  color: var(--on-accent);
   background: var(--honey);
   border-radius: 6px;
   padding: 3px 8px;
@@ -494,7 +624,7 @@ body {
 
 .btn.primary {
   background: var(--honey);
-  color: var(--ink);
+  color: var(--on-accent);
   flex: 2;
 }
 
@@ -531,7 +661,7 @@ body {
   font-family: var(--display);
   font-weight: 800;
   font-size: 46px;
-  color: var(--honey);
+  color: var(--accent-text);
   letter-spacing: -0.03em;
   display: block;
   line-height: 1;
@@ -634,7 +764,7 @@ body {
   font-family: var(--data);
   font-size: 13px;
   font-weight: 600;
-  color: var(--honey);
+  color: var(--accent-text);
   width: 42px;
   text-align: right;
 }
@@ -667,7 +797,7 @@ body {
 
 .hero-eyebrow {
   margin: 0;
-  color: var(--honey);
+  color: var(--accent-text);
   font-family: var(--data);
   font-size: 12px;
   text-transform: uppercase;
@@ -703,7 +833,7 @@ body {
 
 .onboarding-badge {
   margin: 0 0 8px;
-  color: var(--honey);
+  color: var(--accent-text);
   font-family: var(--data);
   font-size: 11px;
   text-transform: uppercase;

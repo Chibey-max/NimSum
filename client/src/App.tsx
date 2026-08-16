@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Archive from './components/Archive'
 import Board from './components/Board'
 import Hero from './components/Hero'
+import ThemeToggle from './components/ThemeToggle'
 import TargetMeter from './components/TargetMeter'
 import { renderShareCard } from './lib/shareImage'
 import {
@@ -292,6 +293,7 @@ export default function App() {
             <span className="mark" aria-hidden="true" />
             <span className="name">NimSum</span>
           </div>
+          <ThemeToggle />
         </header>
         <Hero
           target={puzzle.target}
@@ -316,6 +318,7 @@ export default function App() {
         <div className="meta">
           <span className="difficulty">{puzzle.difficulty}</span>
           <span className="date">{puzzle.date}</span>
+          <ThemeToggle />
           <button className="link" onClick={() => setShowArchive(true)}>
             Practice
           </button>
