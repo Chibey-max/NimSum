@@ -60,13 +60,22 @@ readable but closed, so nobody can backfill a streak.
 **Streaks are derived, not stored.** They are recomputed from solve dates on
 every read, so they cannot drift out of sync with what actually happened.
 
+**Wallet farming is slowed, not just wallet identity checked.** Nimiq Pay can
+issue a pseudonymous per-device identifier. When present, a device minting more
+than five new wallets in a day is refused further sign-ins for the rest of that
+day, which is meant for someone generating throwaway wallets to inflate the
+unique-players count, not a household sharing a phone. A device is never
+blocked from a wallet it has already used that day, and a client that never
+sends a device id (outside Nimiq Pay, or an older build) is never blocked by
+this at all.
+
 ## Verify it yourself
 
 ```sh
 cd server && npm install && npm test
 ```
 
-Twenty-eight tests, run against an embedded Postgres so they exercise the same
+Thirty-three tests, run against an embedded Postgres so they exercise the same
 SQL the production database runs. The ones worth reading:
 
 - 60 consecutive days of boards are generated and every one matches its

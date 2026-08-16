@@ -131,7 +131,7 @@ export async function renderShareCard(input: ShareCardInput): Promise<Blob> {
   // footer
   ctx.fillStyle = MUTED
   ctx.font = '400 18px "Martian Mono", monospace'
-  ctx.fillText('nimsum.onrender.com · a new board every day', width / 2, height - 48)
+  ctx.fillText('nimpay.app/miniapps/open/nimsum.onrender.com', width / 2, height - 48)
 
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {

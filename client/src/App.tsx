@@ -176,7 +176,9 @@ export default function App() {
       `NimSum ${puzzle.date}\n` +
       `${puzzle.target} in ${result.length} ${beat ? '\u2014 par' : `(par ${result.par ?? puzzle.par})`}\n` +
       (stats?.currentStreak ? `${stats.currentStreak} day streak\n` : '') +
-      'nimsum.onrender.com'
+      // Opens straight inside Nimiq Pay with wallet access, rather than a
+      // plain browser tab, for anyone who taps it from inside the app.
+      'https://nimpay.app/miniapps/open/nimsum.onrender.com'
 
     try {
       const blob = await renderShareCard({

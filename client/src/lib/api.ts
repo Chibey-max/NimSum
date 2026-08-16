@@ -1,6 +1,10 @@
 // Talking to the server, and proving who you are.
 
-import { init as initMiniApp, type NimiqProvider } from '@nimiq/mini-app-sdk'
+import {
+  init as initMiniApp,
+  requestDeviceIdentifier,
+  type NimiqProvider,
+} from '@nimiq/mini-app-sdk'
 
 export interface Axial {
   q: number
@@ -175,11 +179,24 @@ export async function signIn(): Promise<SignInResult> {
   }
 
   const { publicKey, signature } = signed as { publicKey: string; signature: string }
+
+  // Best-effort and never blocking: a device identifier lets the server slow
+  // down one visitor minting many wallets to farm the unique-players metric.
+  // Absence of one (declined prompt, older Nimiq Pay build) never stops sign-in.
+  let deviceId: string | undefined
+  try {
+    deviceId = await requestDeviceIdentifier({
+      reason: 'Keeps the daily leaderboard fair by limiting new accounts per device.',
+    })
+  } catch {
+    deviceId = undefined
+  }
+
   const verified = await request<{ token: string; address: string; framing: string }>(
     '/api/auth/verify',
     {
       method: 'POST',
-      body: JSON.stringify({ nonce: challenge.nonce, publicKey, signature }),
+      body: JSON.stringify({ nonce: challenge.nonce, publicKey, signature, deviceId }),
     },
   )
 
