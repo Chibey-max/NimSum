@@ -117,11 +117,10 @@ The schema is created on boot, so there is no separate migration step.
 
 ## Honest limitations
 
-- **The message framing Nimiq Pay uses when signing is not yet confirmed on a
-  real device.** Nimiq wallets frame a signed message rather than signing raw
-  bytes. The server accepts either framing and reports which one matched, so the
-  behaviour is observable rather than assumed. This needs verifying in the app
-  before the signature path can be called proven.
+- **Confirmed on a real device**: Nimiq Pay signs with a framed (prefixed)
+  message, not raw bytes. The server accepted either framing and reported
+  which one matched; a live sign-in on 2026-08-16 confirmed framed is the one
+  real Nimiq Pay uses. The signature verification path is proven, not assumed.
 - Sessions live in process memory. A server restart signs everyone out. Solves
   and streaks are in Postgres and survive.
 - **A free web service sleeps after about fifteen minutes of inactivity** and
