@@ -5,6 +5,8 @@
 // You read "how close am I" and "what am I aiming at" in one glance, which is
 // the only question the player is actually asking while tapping.
 
+import { useId } from 'react'
+
 interface Props {
   target: number
   sum: number
@@ -16,17 +18,23 @@ export default function TargetMeter({ target, sum, state }: Props) {
   const label = String(target)
   // Fill rises from the baseline of the type block.
   const fillY = 100 - ratio * 100
+  // Unique per instance: more than one TargetMeter can be mounted at once
+  // (the practice archive overlays one on top of the main board's), and SVG
+  // ids are global, so a shared id would make one clip the other.
+  const uid = useId()
+  const clipId = `target-glyphs-${uid}`
+  const gradientId = `honey-${uid}`
 
   return (
     <div className={`target ${state}`}>
       <svg viewBox="0 0 200 110" className="target-svg" role="img" aria-label={`Target ${target}, current sum ${sum}`}>
         <defs>
-          <clipPath id="target-glyphs">
+          <clipPath id={clipId}>
             <text x="100" y="86" textAnchor="middle" className="target-glyph">
               {label}
             </text>
           </clipPath>
-          <linearGradient id="honey" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stopColor="var(--honey-bright)" />
             <stop offset="1" stopColor="var(--honey)" />
           </linearGradient>
@@ -38,13 +46,13 @@ export default function TargetMeter({ target, sum, state }: Props) {
         </text>
 
         {/* The rising fill, clipped to the numerals. */}
-        <g clipPath="url(#target-glyphs)">
+        <g clipPath={`url(#${clipId})`}>
           <rect
             x="0"
             width="200"
             y={fillY}
             height="110"
-            fill={state === 'over' ? 'var(--coral)' : 'url(#honey)'}
+            fill={state === 'over' ? 'var(--coral)' : `url(#${gradientId})`}
             className="target-fill"
           />
         </g>
