@@ -186,7 +186,7 @@ export async function signIn(): Promise<SignInResult> {
   let deviceId: string | undefined
   try {
     deviceId = await requestDeviceIdentifier({
-      reason: 'Keeps the daily leaderboard fair by limiting new accounts per device.',
+      reason: 'Keep the leaderboard fair',
     })
   } catch {
     deviceId = undefined
