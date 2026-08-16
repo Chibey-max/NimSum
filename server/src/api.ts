@@ -160,6 +160,11 @@ export function createApp(store: Store, options: AppOptions = {}) {
     await store.touchPlayer(address, verified.identity.publicKey)
     const token = createSession(address, verified.identity.publicKey)
 
+    // The one open question from the build: which framing real Nimiq Pay
+    // uses has never been confirmed on-device. Log it once, here, so it is
+    // observable without instrumenting the client.
+    console.log(`[auth] verified ${address} using ${verified.identity.framing} framing`)
+
     res.json({
       token,
       address,
