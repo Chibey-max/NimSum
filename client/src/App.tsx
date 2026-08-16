@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import Archive from './components/Archive'
 import Board from './components/Board'
 import TargetMeter from './components/TargetMeter'
+import { renderShareCard } from './lib/shareImage'
 import {
   api,
   ApiError,
@@ -29,6 +31,9 @@ export default function App() {
   const [busy, setBusy] = useState(false)
   const [inWallet, setInWallet] = useState(false)
   const [showRules, setShowRules] = useState(false)
+  const [showArchive, setShowArchive] = useState(false)
+  const [onboarding, setOnboarding] = useState(false)
+  const [tipping, setTipping] = useState(false)
 
   const signedIn = address !== null
 
@@ -72,6 +77,10 @@ export default function App() {
         }
         await loadPuzzle()
         refreshLeaderboard()
+        if (!localStorage.getItem('nimsum.onboarded')) {
+          setOnboarding(true)
+          setShowRules(true)
+        }
       } catch (err) {
         setNotice(err instanceof Error ? err.message : 'Could not load today\u2019s board.')
         setPhase('error')
@@ -151,22 +160,81 @@ export default function App() {
 
   const share = async () => {
     if (!puzzle || !result) return
-    const hexes = '\u2b22'.repeat(result.length)
     const beat = result.length <= (result.par ?? puzzle.par)
     const text =
       `NimSum ${puzzle.date}\n` +
       `${puzzle.target} in ${result.length} ${beat ? '\u2014 par' : `(par ${result.par ?? puzzle.par})`}\n` +
-      `${hexes}\n` +
-      (stats?.currentStreak ? `${stats.currentStreak} day streak\n` : '')
+      (stats?.currentStreak ? `${stats.currentStreak} day streak\n` : '') +
+      'nimsum.onrender.com'
+
     try {
+      const blob = await renderShareCard({
+        date: puzzle.date,
+        target: puzzle.target,
+        length: result.length,
+        par: result.par ?? puzzle.par,
+        score: result.score,
+        beatPar: beat,
+        streak: stats?.currentStreak ?? 0,
+      })
+      const file = new File([blob], `nimsum-${puzzle.date}.png`, { type: 'image/png' })
+
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], text })
+        return
+      }
       if (navigator.share) {
         await navigator.share({ text })
         return
       }
-      await navigator.clipboard.writeText(text)
-      setNotice('Result copied.')
+
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = file.name
+      a.click()
+      URL.revokeObjectURL(url)
+      setNotice('Image saved. Share it from your gallery.')
     } catch {
-      setNotice('Could not share. Long-press to copy instead.')
+      try {
+        await navigator.clipboard.writeText(text)
+        setNotice('Result copied.')
+      } catch {
+        setNotice('Could not share. Long-press to copy instead.')
+      }
+    }
+  }
+
+  const dismissOnboarding = () => {
+    localStorage.setItem('nimsum.onboarded', '1')
+    setOnboarding(false)
+    setShowRules(false)
+  }
+
+  // NIM moving here is a voluntary, optional tip to the developer. It never
+  // touches gameplay, scoring, or identity, the wallet is custodial to the
+  // sender at every step.
+  const TIP_RECIPIENT = 'NQ84 4XNC H522 54PC K3FC CU2H 6FFK 7VK2 20T1'
+  const LUNAS_PER_NIM = 100_000
+
+  const tip = async (nim: number) => {
+    setTipping(true)
+    setNotice(null)
+    try {
+      const provider = await getProvider()
+      if (!provider) throw new Error('Open NimSum inside Nimiq Pay to send a tip.')
+      const sent = await provider.sendBasicTransaction({
+        recipient: TIP_RECIPIENT,
+        value: Math.round(nim * LUNAS_PER_NIM),
+      })
+      if (sent && typeof sent === 'object' && 'error' in sent) {
+        throw new Error((sent as { error?: { message?: string } }).error?.message ?? 'Tip was declined.')
+      }
+      setNotice('Thank you for the tip.')
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : 'Could not send the tip.')
+    } finally {
+      setTipping(false)
     }
   }
 
@@ -203,19 +271,28 @@ export default function App() {
         <div className="meta">
           <span className="difficulty">{puzzle.difficulty}</span>
           <span className="date">{puzzle.date}</span>
+          <button className="link" onClick={() => setShowArchive(true)}>
+            Practice
+          </button>
         </div>
       </header>
+
+      {showArchive && <Archive onClose={() => setShowArchive(false)} />}
 
       <p className="prompt">
         Link neighbours to make <strong>{puzzle.target}</strong>. Par is{' '}
         <strong>{puzzle.par}</strong> hexes.{' '}
-        <button className="link" onClick={() => setShowRules((s) => !s)}>
+        <button
+          className="link"
+          onClick={() => (onboarding ? dismissOnboarding() : setShowRules((s) => !s))}
+        >
           {showRules ? 'Hide rules' : 'How to play'}
         </button>
       </p>
 
       {showRules && (
-        <div className="rules">
+        <div className={onboarding ? 'rules onboarding' : 'rules'}>
+          {onboarding && <p className="onboarding-badge">Welcome to NimSum</p>}
           <ol>
             <li>Tap any hex to start.</li>
             <li>Tap a touching hex to extend the chain. Each hex can be used once.</li>
@@ -226,6 +303,11 @@ export default function App() {
             Everyone plays the same board today. It changes at midnight UTC, and gets harder
             through the week.
           </p>
+          {onboarding && (
+            <button className="btn primary" onClick={dismissOnboarding}>
+              Let’s play
+            </button>
+          )}
         </div>
       )}
 
@@ -318,6 +400,22 @@ export default function App() {
           </button>
           {notice && <p className="notice">{notice}</p>}
           <p className="footnote">New board at midnight UTC.</p>
+
+          {inWallet && (
+            <div className="tip">
+              <p className="footnote">
+                Enjoying NimSum? An optional tip in NIM helps keep it running. It doesn’t affect
+                your score or streak either way.
+              </p>
+              <div className="tip-row">
+                {[1, 5, 10].map((n) => (
+                  <button key={n} className="btn ghost" onClick={() => tip(n)} disabled={tipping}>
+                    {tipping ? '…' : `Tip ${n} NIM`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
       )}
 
