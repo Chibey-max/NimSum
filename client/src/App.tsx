@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Archive from './components/Archive'
 import Board from './components/Board'
+import Hero from './components/Hero'
 import TargetMeter from './components/TargetMeter'
 import { renderShareCard } from './lib/shareImage'
 import {
@@ -34,6 +35,7 @@ export default function App() {
   const [showArchive, setShowArchive] = useState(false)
   const [onboarding, setOnboarding] = useState(false)
   const [tipping, setTipping] = useState(false)
+  const [showHero, setShowHero] = useState(false)
 
   const signedIn = address !== null
 
@@ -64,8 +66,17 @@ export default function App() {
 
   useEffect(() => {
     ;(async () => {
-      getProvider().then((p) => setInWallet(p !== null))
       try {
+        const provider = await getProvider()
+        const inWalletNow = provider !== null
+        setInWallet(inWalletNow)
+        // A browser visitor who has not played before sees the pitch first;
+        // opening inside Nimiq Pay, or having played before, goes straight
+        // to the board.
+        if (!inWalletNow && !localStorage.getItem('nimsum.played')) {
+          setShowHero(true)
+        }
+
         if (storedToken()) {
           try {
             const me = await api.me()
@@ -240,10 +251,18 @@ export default function App() {
 
   // -- render -------------------------------------------------------------
 
+  const hive = (
+    <div className="hive" aria-hidden="true">
+      <span className="glow honey" />
+      <span className="glow coral" />
+    </div>
+  )
+
   if (phase === 'loading') {
     return (
       <main className="shell">
-        <div className="boot">Loading today\u2019s board</div>
+        {hive}
+        <div className="boot">{'Loading today\u2019s board'}</div>
       </main>
     )
   }
@@ -251,6 +270,7 @@ export default function App() {
   if (phase === 'error' || !puzzle) {
     return (
       <main className="shell">
+        {hive}
         <div className="boot">
           <p>{notice ?? 'Could not reach the server.'}</p>
           <button className="btn" onClick={() => location.reload()}>
@@ -261,8 +281,31 @@ export default function App() {
     )
   }
 
+  if (showHero) {
+    return (
+      <main className="shell">
+        {hive}
+        <header className="topbar">
+          <div className="brand">
+            <span className="mark" aria-hidden="true" />
+            <span className="name">NimSum</span>
+          </div>
+        </header>
+        <Hero
+          target={puzzle.target}
+          playersToday={puzzle.playersToday}
+          onPlay={() => {
+            localStorage.setItem('nimsum.played', '1')
+            setShowHero(false)
+          }}
+        />
+      </main>
+    )
+  }
+
   return (
     <main className="shell">
+      {hive}
       <header className="topbar">
         <div className="brand">
           <span className="mark" aria-hidden="true" />
@@ -445,7 +488,7 @@ export default function App() {
         <section className="you-stats">
           <span>{shortAddress(stats.address)}</span>
           <span>
-            {stats.played} played \u00b7 {stats.parCount} at par \u00b7 best streak{' '}
+            {stats.played} played {'\u00b7'} {stats.parCount} at par {'\u00b7'} best streak{' '}
             {stats.bestStreak}
           </span>
         </section>
